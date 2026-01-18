@@ -1,0 +1,115 @@
+
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>NGO Registration & Donations</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body{padding:20px;background:#f8fafc}
+    .card{margin-bottom:16px}
+  </style>
+</head>
+<body class="container">
+  <h1 class="mb-4">NGO Registration & Donation System</h1>
+
+  <div class="row">
+    <div class="col-md-6">
+      <div class="card p-3">
+        <h5>Register</h5>
+        <input id="r_email" class="form-control mb-2" placeholder="email">
+        <input id="r_pass" type="password" class="form-control mb-2" placeholder="password">
+        <input id="r_name" class="form-control mb-2" placeholder="name">
+        <button class="btn btn-primary" onclick="register()">Register</button>
+      </div>
+
+      <div class="card p-3">
+        <h5>Login</h5>
+        <input id="l_email" class="form-control mb-2" placeholder="email">
+        <input id="l_pass" type="password" class="form-control mb-2" placeholder="password">
+        <button class="btn btn-success" onclick="login()">Login</button>
+        <div id="login_msg" class="mt-2"></div>
+      </div>
+
+      <div class="card p-3" id="donate_card" style="display:none">
+        <h5>Donate</h5>
+        <input id="amount" class="form-control mb-2" placeholder="Amount (INR)">
+        <button class="btn btn-warning" onclick="donate()">Donate</button>
+      </div>
+
+      <div class="card p-3">
+        <h5>Donation History</h5>
+        <ul id="donation_list" class="list-group"></ul>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card p-3">
+        <h5>User Info</h5>
+        <pre id="user_info">Not logged in</pre>
+      </div>
+
+      <div class="card p-3">
+        <h5>Quick Admin</h5>
+        <button class="btn btn-outline-primary" onclick="openAdmin()">Open Admin Dashboard</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const API = 'http://localhost:4000';
+
+function log(msg){ console.log(msg); }
+
+async function register(){
+  const body={email: r_email.value, password: r_pass.value, name: r_name.value};
+  const r = await fetch(API + '/auth/register', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  if(r.ok) alert('Registered');
+  else alert('Error');
+}
+
+async function login(){
+  const body={email: l_email.value, password: l_pass.value};
+  const r = await fetch(API + '/auth/login', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  const d = await r.json();
+  if(d.token){
+    localStorage.setItem('token', d.token);
+    document.getElementById('user_info').innerText = JSON.stringify(d.user, null, 2);
+    document.getElementById('donate_card').style.display = 'block';
+    document.getElementById('login_msg').innerText = 'Logged in';
+    loadDonations();
+  } else {
+    document.getElementById('login_msg').innerText = 'Login failed';
+  }
+}
+
+async function donate(){
+  const amt = parseFloat(amount.value) * 100;
+  const token = localStorage.getItem('token');
+  if(!token){ alert('login first'); return; }
+  const r = await fetch(API + '/donations', {method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token}, body: JSON.stringify({amount_cents: amt})});
+  const d = await r.json();
+  window.open('http://localhost:4000' + d.checkout_url, '_blank', 'width=600,height=600');
+  setTimeout(()=>loadDonations(), 1000);
+}
+
+async function loadDonations(){
+  const token = localStorage.getItem('token');
+  if(!token) return;
+  const r = await fetch(API + '/donations', {headers:{'Authorization':'Bearer '+token}});
+  const arr = await r.json();
+  const list = document.getElementById('donation_list');
+  list.innerHTML = '';
+  arr.forEach(x=>{
+    const li = document.createElement('li');
+    li.className='list-group-item';
+    li.innerText = `₹${(x.amount_cents/100).toFixed(2)} — ${x.status} — ${new Date(x.created_at).toLocaleString()}`;
+    list.appendChild(li);
+  });
+}
+
+function openAdmin(){ window.open('admin.html','_blank'); }
+</script>
+</body>
+</html>
